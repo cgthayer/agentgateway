@@ -1,0 +1,30 @@
+[project]
+name = "myngl-agent"
+version = "0.1.0"
+description = "Myngl demo Flask service using smolagents + LiteLLM (Anthropic)"
+authors = [
+  { name = "AgentGateway Team" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "Flask>=3.0.0",
+  "python-dotenv>=1.0.1",
+  "smolagents>=1.0.0",
+  "litellm>=1.52.0"
+]
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

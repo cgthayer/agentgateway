@@ -1,0 +1,37 @@
+comments:
+- "https://agentgateway.dev/docs/llm/providers/anthropic/"
+
+binds:
+- port: 3000
+  listeners:
+  - routes:
+    - backends:
+      - ai:
+          name: anthropic
+          provider:
+            anthropic:
+              model: claude-sonnet-4
+      policies:
+        backendAuth:
+          key: "$ANTHROPIC_API_KEY"
+        ai:
+          promptGuard:
+            request:
+              regex:
+                action:
+                  reject:
+                    response:
+                      body: "Request rejected due to inappropriate content"
+                rules:
+                - pattern: SSN
+                  name: SSN
+                - pattern: Social Security
+                  name: Social Security
+            response:
+              regex:
+                action:
+                  reject:
+                    response:
+                      body: "Response rejected due to inappropriate content"
+                rules:
+                - builtin: email
