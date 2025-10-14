@@ -111,6 +111,7 @@ validate: run-validation-deps $(CONFIG_FILES) stop-validation-deps
 $(CONFIG_FILES):
 	@cargo run -- -f $@ --validate-only
 
+.PHONY: myngl myngl-stop
 myngl:
 	docker compose -f docker-compose-myngl.yaml up -d
 

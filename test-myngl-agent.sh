@@ -7,7 +7,7 @@ if [ ${#@} -lt 1 ]; then
 fi
 
 PROMPT="$1"
-URL="http://127.0.0.1:9000/chat"
+URL="http://127.0.0.1:3000/chat"
 
 curl -sS -X POST \
   -H "Content-Type: application/json" \

@@ -34,7 +34,8 @@ RUN uv pip install -q hatchling editables
 RUN --mount=type=cache,target=/tmp/.cache,id=uv-cache-myngl \
     uv --no-progress pip install -e .
 
+# note the .venv is excluded in .dockerignore
 COPY . .
 
-EXPOSE 8000
+EXPOSE 3000
 CMD ["/app/app.py"]

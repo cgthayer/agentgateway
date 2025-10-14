@@ -10,7 +10,7 @@ import uuid
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
-from smolagents import Agent
+from smolagents import ToolCallingAgent
 from smolagents import LiteLLMModel
 
 # Load .env from repository root
@@ -44,11 +44,11 @@ def build_openai_like_response(content: str, model: str) -> Dict[str, Any]:
 
 
 def get_agent():
-    """Create and cache a smolagents Agent with a LiteLLM model.
+    """Create and cache a smolagents ToolCallingAgent with a LiteLLM model.
 
     Uses Anthropic via LiteLLM. Expects ANTHROPIC_API_KEY in env.
     """
-    if Agent is None or LiteLLMModel is None:
+    if ToolCallingAgent is None or LiteLLMModel is None:
         raise RuntimeError(
             "smolagents or LiteLLMModel not available. Ensure dependencies are installed."
         )
@@ -61,7 +61,7 @@ def get_agent():
         pass
 
     model = LiteLLMModel(model_id=DEFAULT_MODEL_ID, temperature=0.0)
-    return Agent(tools=tools, model=model, max_steps=20)
+    return ToolCallingAgent(tools=tools, model=model, max_steps=20)
 
 
 @app.post("/chat")
@@ -89,5 +89,5 @@ def create_app() -> Flask:
 
 
 if __name__ == "__main__":
-    # Bind to 127.0.0.1 as requested, port 9000
-    app.run(host="127.0.0.1", port=9000)
+    app.run(host="0.0.0.0", port=3000)  # 0.0.0.0 to ensure external connections work outside the docker
+    
