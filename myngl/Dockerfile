@@ -1,21 +1,40 @@
-FROM python:3.11-slim
+FROM ubuntu:24.04
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+RUN rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true
+RUN apt update
+RUN apt install -y strace
+RUN apt install -y python3 python3-pip python3-venv
+
+# Set environment variables to disable pip's rich output and threading issues
+ENV PIP_PROGRESS_BAR=off
+# ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PYTHONUNBUFFERED=1
+ENV RUST_BACKTRACE=full
+
+# ENV UV_CACHE_DIR=/tmp/.cache
+# RUN mkdir $UV_CACHE_DIR && chmod a+rw $UV_CACHE_DIR
 
 WORKDIR /app
 
-# Install runtime dependencies directly (container build simplicity)
-# Project uses `pyproject.toml` + uv for local dev, but image installs runtime deps via pip
-COPY pyproject.toml ./pyproject.toml
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir --no-build-isolation -r pyproject.toml
+RUN python3 -m venv .venv
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN pip install uv
 
-# Copy application code
-COPY app.py /app/app.py
+# Configure pip to avoid threading issues globally
+# RUN pip config --global set global.progress_bar off
 
-# Expose the Flask port
-EXPOSE 9000
+COPY pyproject.toml .
+COPY README.md .
 
-# Read env from container env vars; .env can be provided via compose env_file
-CMD ["python", "/app/app.py"]
+RUN uv cache dir
+RUN uv pip install -q --upgrade pip
+RUN uv pip install -q hatchling editables
+RUN --mount=type=cache,target=/tmp/.cache,id=uv-cache-myngl \
+    uv --no-progress pip install -e .
+
+COPY . .
+
+EXPOSE 8000
+CMD ["/app/app.py"]

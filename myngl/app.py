@@ -1,3 +1,4 @@
+#!/bin/env python3
 """
 Myngl Agent (Demo)
 """
@@ -59,8 +60,8 @@ def get_agent():
         # For now, a simple no-op tool stub could be added here.
         pass
 
-    model = LiteLLMModel(model_id=DEFAULT_MODEL_ID)
-    return Agent(tools=tools, model=model, max_steps=1)
+    model = LiteLLMModel(model_id=DEFAULT_MODEL_ID, temperature=0.0)
+    return Agent(tools=tools, model=model, max_steps=20)
 
 
 @app.post("/chat")
