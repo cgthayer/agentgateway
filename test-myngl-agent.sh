@@ -7,9 +7,24 @@ if [ ${#@} -lt 1 ]; then
 fi
 
 PROMPT="$1"
-URL="http://127.0.0.1:3000/chat"
+# URL="http://127.0.0.1:3030/v1/chat/completions"
+URL="http://127.0.0.1:3000"  # via agentgateway
 
-curl -sS -X POST \
+# OpenAI-compatible chat completions format
+set -x
+curl -v -X POST \
   -H "Content-Type: application/json" \
-  -d "{\"prompt\": \"${PROMPT//\"/\\\"}\"}" \
-  "$URL" | jq '.'
+  -d "{
+    \"model\": \"claude-sonnet-4-20250514\",
+    \"messages\": [
+      {
+        \"role\": \"user\",
+        \"content\": \"${PROMPT//\"/\\\"}\"
+      }
+    ]
+  }" \
+  "$URL" 2>&1 | tee output.json
+
+# jq . output.json || cat output.json
+# cat output.json
+

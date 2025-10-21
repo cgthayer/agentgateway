@@ -37,5 +37,5 @@ RUN --mount=type=cache,target=/tmp/.cache,id=uv-cache-myngl \
 # note the .venv is excluded in .dockerignore
 COPY . .
 
-EXPOSE 3000
+EXPOSE 3030
 CMD ["/app/app.py"]

@@ -1,5 +1,5 @@
 #!/bin/bash
-curl 'http://0.0.0.0:3000/' \
+curl 'http://0.0.0.0:3030/' \
 --header 'Content-Type: application/json' \
 --data ' {
   "model": "gpt-3.5-turbo",

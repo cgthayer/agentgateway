@@ -1,5 +1,5 @@
-comments:
-- "https://agentgateway.dev/docs/llm/providers/anthropic/"
+# comments:
+# - "https://agentgateway.dev/docs/llm/providers/anthropic/"
 
 binds:
 - port: 3000
@@ -7,11 +7,17 @@ binds:
   - routes:
     - backends:
       - ai:
-          name: anthropic
+          name: myngl-test
+          hostOverride: localhost:3030
           provider:
-            anthropic:
-              model: claude-sonnet-4
+            openAI:
+              model: command
       policies:
+        urlRewrite:
+          authority:
+            full: localhost:3030
+          path:
+            full: "/v1/chat/completions"
         backendAuth:
           key: "$ANTHROPIC_API_KEY"
         ai:
@@ -35,3 +41,4 @@ binds:
                       body: "Response rejected due to inappropriate content"
                 rules:
                 - builtin: email
+

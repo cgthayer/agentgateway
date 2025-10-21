@@ -2,6 +2,7 @@
 
 . .env
 
+# through gateway
 curl http://localhost:3000   -H "Content-Type: application/json"   -H "Authorization: Bearer $ANTHROPIC_API_KEY"   -d '
 {
     "model": "sonnet-4",

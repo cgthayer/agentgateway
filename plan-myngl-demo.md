@@ -1,5 +1,6 @@
 # Plan Myngl Demo
 
+- start by reading @coding-guidelines.md
 - this will be a python service in the myngl directory
 - set it up as a python project with a pyproject.toml
 - create a flask service that responds to simple openAI chat completion requests for a single prompt and response.
@@ -19,7 +20,7 @@
 - API keys: Read `ANTHROPIC_API_KEY` from the repository root `.env` using `python-dotenv`/`dotenv`.
 - Agent: Use HF `smolagents` regular LLM agent (not CodeAgent), configured for future tool use even in single-turn mode.
 - MCP tool: Stub a Trino MCP tool, gated by an environment flag `ENABLE_TRINO_MCP=false` by default. For later, see https://github.com/alaturqua/mcp-trino-python
-- Networking: Bind to `127.0.0.1:9000`. No CORS needed yet.
+- Networking: Bind to `127.0.0.1:3030`. No CORS needed yet.
 - Docker: Add a `myngl` service to `docker-compose-myngl.yaml` alongside Jaeger.
 - Layout: Keep implementation under the `myngl/` directory with clear filenames (no separate deep agent directory for now).
 - Test script: Provide `test-myngl-agent.sh` to send a prompt with curl, e.g. `./test-myngl-agent.sh "What are the days of the week?"`.

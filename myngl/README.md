@@ -31,6 +31,10 @@ Environment variables (read by `python-dotenv` from repo root `.env`):
 - `MODEL_ID`: optional, defaults to `claude-sonnet-4-20250514`
 - `ENABLE_TRINO_MCP`: optional, `false` by default
 
+The file `config-myngl.yaml` is an example of how to configure this agent in agentgateway.
+* See [Example AI Prompt Guard](examples/ai-prompt-guard/README.md)
+
+
 ## API
 
 - `POST /chat`
