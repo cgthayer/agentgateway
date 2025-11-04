@@ -1,0 +1,16 @@
+# MCP Server Configuration
+# Each server will be loaded and its tools made available to the agent
+
+servers:
+  # Trino MCP Server - for database queries
+  - name: trino
+    enabled: true
+    command: bash
+    args:
+      - "myngl-start-mcp-trino.sh"
+    env:
+      # Environment variables for this specific server
+      # TRINO_HOST: localhost
+      # TRINO_PORT: 8080
+      # TRINO_USER: AgentAnalyst
+    description: "Trino database query server"

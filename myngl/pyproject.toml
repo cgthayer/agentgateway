@@ -11,7 +11,9 @@ dependencies = [
   "Flask>=3.0.0",
   "python-dotenv>=1.0.1",
   "smolagents>=1.0.0",
-  "litellm>=1.52.0"
+  "litellm>=1.52.0",
+  "PyYAML>=6.0.0",
+  "mcp>=1.0.0"
 ]
 
 [build-system]

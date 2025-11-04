@@ -6,7 +6,13 @@ A minimal Flask service exposing `POST /chat`, backed by Hugging Face smolagents
 
 - Python 3.x
 - `uv` for dependency management: https://github.com/astral-sh/uv
+   - `pip install uv`
+   - or `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - An `.env` file at the repo root containing `ANTHROPIC_API_KEY=...`
+- Install a mcp for trino, such as https://github.com/tuannvm/mcp-trino
+   - `brew install tuannvm/mcp/mcp-trino`
+   - or `curl -fsSL https://raw.githubusercontent.com/tuannvm/mcp-trino/main/install.sh | bash`
+
 
 ## Setup (Local)
 
