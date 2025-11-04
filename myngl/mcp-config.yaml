@@ -7,7 +7,7 @@ servers:
     enabled: true
     command: bash
     args:
-      - "myngl-start-mcp-trino.sh"
+      - "start-trino-mcp.sh"
     env:
       # Environment variables for this specific server
       # TRINO_HOST: localhost
