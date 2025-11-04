@@ -10,5 +10,8 @@ export TRINO_USER=AgentAnalyst
 # http://myngl-trino:8080/
 # 172.17.0.1
 
-export TRINO_HOST=172.18.0.1 TRINO_USER=AgentAnalyst TRINO_SCHEME=http TRINO_PORT=8080
+export TRINO_SCHEME=http
+export TRINO_HOST=172.18.0.1
+export TRINO_PORT=8080
+export TRINO_USER=AgentAlice
 mcp-trino

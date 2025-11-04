@@ -41,25 +41,8 @@ MCP_CONFIG_PATH = os.getenv("MCP_CONFIG_PATH", str(Path(__file__).parent / "mcp-
 
 app = Flask(__name__)
 
-
-def build_openai_like_response(content: str, model: str) -> Dict[str, Any]:
-    now = int(time.time())
-    return {
-        "id": f"chatcmpl-{uuid.uuid4().hex}",
-        "object": "chat.completion",
-        "created": now,
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": content,
-                },
-                "finish_reason": "stop",
-            }
-        ],
-    }
+# Global registry to keep MCP contexts alive and prevent garbage collection
+_MCP_CONTEXTS_REGISTRY = []
 
 
 class MCPTool(Tool):
@@ -82,22 +65,23 @@ class MCPTool(Tool):
                 pdesc = prop_info.get("description", "")
                 self.inputs[prop_name] = {"type": ptype, "description": pdesc}
                 logger.info(f"Loaded input parameter: {prop_name} ({ptype}) - {pdesc}")
-
         
-        # Create forward method dynamically with correct signature
         self._setup_forward_method()
         self.is_initialized = True
     
     def _setup_forward_method(self):
-        """Dynamically create forward method with parameters matching inputs."""
+        """Dynamically create forward method with parameters matching inputs.
+                
+        Each Tool has different arguments expected, which smolagents checks, 
+        so we need to dynamically create the forward method for each tool
+        with exactly the right signature.
+        """
         # Create the proper signature
         params = [inspect.Parameter('self', inspect.Parameter.POSITIONAL_OR_KEYWORD)]
         for param_name in self.inputs.keys():
             params.append(
                 inspect.Parameter(param_name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
             )
-        
-        # Create the signature
         sig = inspect.Signature(params)
         
         # Define the actual forward implementation
@@ -116,7 +100,7 @@ class MCPTool(Tool):
                 
                 # Schedule the coroutine on the MCP session's event loop
                 future = asyncio.run_coroutine_threadsafe(call_tool(), self.event_loop)
-                result = future.result(timeout=60)  # secs
+                result = future.result(timeout=30)  # secs
                 return result
             except Exception as e:
                 logger.error(f"Error calling MCP tool {self.mcp_tool_name}: {e}", exc_info=True)
@@ -145,7 +129,13 @@ class MCPServerConnection:
         self.event_loop = None
     
     async def connect(self) -> List[Tool]:
-        """Connect to MCP server and return available tools."""
+        """Connect to MCP server and return available tools.
+
+        This is also complicated because MCP uses async context managers that create
+        background tasks. We intentionally do NOT call __aexit__ on the contexts
+        here because they need to remain alive for the duration of the application.
+        Exiting them would trigger cleanup and close the connection.
+        """
         # Store the event loop being used for this connection
         self.event_loop = asyncio.get_event_loop()
         
@@ -159,15 +149,20 @@ class MCPServerConnection:
             env=server_env
         )
         
-        # Create and enter stdio_client context - keep it alive
+        # Create and enter stdio_client context - keep reference to prevent cleanup
         self._stdio_context = stdio_client(server_params)
         self.read_stream, self.write_stream = await self._stdio_context.__aenter__()
         
-        # Create and enter session context - keep it alive
+        # Register context globally to prevent garbage collection
+        _MCP_CONTEXTS_REGISTRY.append(self._stdio_context)
+        
+        # Create and enter session context - must use context manager for proper initialization
         self._session_context = ClientSession(self.read_stream, self.write_stream)
         self.session = await self._session_context.__aenter__()
         
-        # Initialize session
+        # Register session context globally to prevent garbage collection
+        _MCP_CONTEXTS_REGISTRY.append(self._session_context)
+        
         await self.session.initialize()
         
         # List available tools
@@ -191,14 +186,14 @@ class MCPServerConnection:
         return mcp_tools
     
     async def disconnect(self):
-        """Disconnect from MCP server."""
-        try:
-            if self._session_context:
-                await self._session_context.__aexit__(None, None, None)
-            if self._stdio_context:
-                await self._stdio_context.__aexit__(None, None, None)
-        except Exception as e:
-            logger.error(f"Error disconnecting from '{self.name}': {e}", exc_info=True)
+        """Disconnect from MCP server.
+        
+        Note: We intentionally do NOT call __aexit__ on the contexts here because
+        they need to remain alive for the duration of the application. Exiting them
+        from a different task/thread than they were entered causes errors.
+        The contexts will be cleaned up when the event loop stops.
+        """
+        logger.info(f"Disconnect called for '{self.name}' (contexts kept alive)")
 
 
 def load_mcp_config() -> List[dict]:
@@ -303,6 +298,26 @@ def get_agent():
 
     model = LiteLLMModel(model_id=DEFAULT_MODEL_ID, temperature=0.0)
     return ToolCallingAgent(tools=tools, model=model, max_steps=20)
+
+
+def build_openai_like_response(content: str, model: str) -> Dict[str, Any]:
+    now = int(time.time())
+    return {
+        "id": f"chatcmpl-{uuid.uuid4().hex}",
+        "object": "chat.completion",
+        "created": now,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
 
 
 @app.post("/chat")
