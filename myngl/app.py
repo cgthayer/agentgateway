@@ -5,6 +5,7 @@ Myngl Agent (Demo)
 
 from typing import Any, Dict, List, Optional
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -66,39 +67,62 @@ class MCPTool(Tool):
         self.description = description
         self.mcp_tool_name = mcp_tool_name
         self.session = session
+        self.input_schema = input_schema
         
         # Convert MCP input schema to smolagents format
         self.inputs = {}
         if input_schema and "properties" in input_schema:
             for prop_name, prop_info in input_schema["properties"].items():
-                self.inputs[prop_name] = {
-                    "type": prop_info.get("type", "string"),
-                    "description": prop_info.get("description", "")
-                }
+                ptype = prop_info.get("type", "string")
+                pdesc = prop_info.get("description", "")
+                self.inputs[prop_name] = {"type": ptype, "description": pdesc}
+                logger.info(f"Loaded input parameter: {prop_name} ({ptype}) - {pdesc}")
         
         self.output_type = "string"
+        
+        # Create forward method dynamically with correct signature
+        self._setup_forward_method()
     
-    def forward(self, **kwargs) -> str:
-        """Execute the MCP tool call."""
-        try:
-            # Call MCP tool asynchronously
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+    def _setup_forward_method(self):
+        """Dynamically create forward method with parameters matching inputs."""
+        # Create parameters for the signature
+        params = [inspect.Parameter('self', inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+        for param_name in self.inputs.keys():
+            params.append(
+                inspect.Parameter(param_name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            )
+        
+        # Create the signature
+        sig = inspect.Signature(params)
+        
+        # Define the actual forward implementation
+        def forward_impl(self, **kwargs):
             try:
-                result = loop.run_until_complete(
-                    self.session.call_tool(self.mcp_tool_name, arguments=kwargs)
-                )
-                # Extract content from result
-                if hasattr(result, 'content') and result.content:
-                    if isinstance(result.content, list):
-                        return "\n".join(str(item.text) if hasattr(item, 'text') else str(item) for item in result.content)
-                    return str(result.content)
-                return json.dumps(result)
-            finally:
-                loop.close()
-        except Exception as e:
-            logger.error(f"Error calling MCP tool {self.mcp_tool_name}: {e}", exc_info=True)
-            return f"Error calling MCP tool {self.mcp_tool_name}: {str(e)}"
+                # Call MCP tool asynchronously
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result = loop.run_until_complete(
+                        self.session.call_tool(self.mcp_tool_name, arguments=kwargs)
+                    )
+                    # Extract content from result
+                    if hasattr(result, 'content') and result.content:
+                        if isinstance(result.content, list):
+                            return "\n".join(str(item.text) if hasattr(item, 'text') else str(item) for item in result.content)
+                        return str(result.content)
+                    return json.dumps(result)
+                finally:
+                    loop.close()
+            except Exception as e:
+                logger.error(f"Error calling MCP tool {self.mcp_tool_name}: {e}", exc_info=True)
+                return f"Error calling MCP tool {self.mcp_tool_name}: {str(e)}"
+        
+        # Attach the signature to the method
+        forward_impl.__signature__ = sig
+        
+        # Bind it to this instance
+        import types
+        self.forward = types.MethodType(forward_impl, self)
 
 
 class MCPServerConnection:

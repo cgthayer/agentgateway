@@ -37,5 +37,10 @@ RUN --mount=type=cache,target=/tmp/.cache,id=uv-cache-myngl \
 # note the .venv is excluded in .dockerignore
 COPY . .
 
+# MCP: for connecting to the trino(s)
+RUN apt install -y curl
+RUN curl -fsSL https://raw.githubusercontent.com/tuannvm/mcp-trino/main/install.sh | bash
+ENV PATH="/root/.local/bin:$PATH"
+
 EXPOSE 3030
 CMD ["/app/app.py"]
