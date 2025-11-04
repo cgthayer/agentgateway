@@ -5,11 +5,14 @@ Myngl Agent (Demo)
 
 from typing import Any, Dict, List, Optional
 import asyncio
+import concurrent.futures
 import inspect
 import json
 import logging
 import os
+import threading
 import time
+import types
 import uuid
 from pathlib import Path
 
@@ -62,14 +65,16 @@ def build_openai_like_response(content: str, model: str) -> Dict[str, Any]:
 class MCPTool(Tool):
     """Wrapper to make MCP server tools available to smolagents."""
     
-    def __init__(self, name: str, description: str, input_schema: dict, mcp_tool_name: str, session: ClientSession):
+    def __init__(self, name: str, description: str, input_schema: dict, mcp_tool_name: str, session: ClientSession, event_loop):
         self.name = name
         self.description = description
         self.mcp_tool_name = mcp_tool_name
         self.session = session
+        self.event_loop = event_loop
         self.input_schema = input_schema
         
         # Convert MCP input schema to smolagents format
+        self.output_type = "string"
         self.inputs = {}
         if input_schema and "properties" in input_schema:
             for prop_name, prop_info in input_schema["properties"].items():
@@ -77,15 +82,15 @@ class MCPTool(Tool):
                 pdesc = prop_info.get("description", "")
                 self.inputs[prop_name] = {"type": ptype, "description": pdesc}
                 logger.info(f"Loaded input parameter: {prop_name} ({ptype}) - {pdesc}")
-        
-        self.output_type = "string"
+
         
         # Create forward method dynamically with correct signature
         self._setup_forward_method()
+        self.is_initialized = True
     
     def _setup_forward_method(self):
         """Dynamically create forward method with parameters matching inputs."""
-        # Create parameters for the signature
+        # Create the proper signature
         params = [inspect.Parameter('self', inspect.Parameter.POSITIONAL_OR_KEYWORD)]
         for param_name in self.inputs.keys():
             params.append(
@@ -98,21 +103,21 @@ class MCPTool(Tool):
         # Define the actual forward implementation
         def forward_impl(self, **kwargs):
             try:
-                # Call MCP tool asynchronously
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    result = loop.run_until_complete(
-                        self.session.call_tool(self.mcp_tool_name, arguments=kwargs)
-                    )
+                # Use the event loop that was used to create the session
+                async def call_tool():
+                    result = await self.session.call_tool(self.mcp_tool_name, arguments=kwargs)
+                    
                     # Extract content from result
                     if hasattr(result, 'content') and result.content:
                         if isinstance(result.content, list):
                             return "\n".join(str(item.text) if hasattr(item, 'text') else str(item) for item in result.content)
                         return str(result.content)
                     return json.dumps(result)
-                finally:
-                    loop.close()
+                
+                # Schedule the coroutine on the MCP session's event loop
+                future = asyncio.run_coroutine_threadsafe(call_tool(), self.event_loop)
+                result = future.result(timeout=60)  # secs
+                return result
             except Exception as e:
                 logger.error(f"Error calling MCP tool {self.mcp_tool_name}: {e}", exc_info=True)
                 return f"Error calling MCP tool {self.mcp_tool_name}: {str(e)}"
@@ -121,7 +126,6 @@ class MCPTool(Tool):
         forward_impl.__signature__ = sig
         
         # Bind it to this instance
-        import types
         self.forward = types.MethodType(forward_impl, self)
 
 
@@ -136,10 +140,15 @@ class MCPServerConnection:
         self.session: Optional[ClientSession] = None
         self.read_stream = None
         self.write_stream = None
-        self._context_manager = None
+        self._stdio_context = None
+        self._session_context = None
+        self.event_loop = None
     
     async def connect(self) -> List[Tool]:
         """Connect to MCP server and return available tools."""
+        # Store the event loop being used for this connection
+        self.event_loop = asyncio.get_event_loop()
+        
         # Merge environment variables
         server_env = os.environ.copy()
         server_env.update(self.env)
@@ -150,13 +159,13 @@ class MCPServerConnection:
             env=server_env
         )
         
-        # Create context manager for stdio_client
-        self._context_manager = stdio_client(server_params)
-        self.read_stream, self.write_stream = await self._context_manager.__aenter__()
+        # Create and enter stdio_client context - keep it alive
+        self._stdio_context = stdio_client(server_params)
+        self.read_stream, self.write_stream = await self._stdio_context.__aenter__()
         
-        # Create session
-        self.session = ClientSession(self.read_stream, self.write_stream)
-        await self.session.__aenter__()
+        # Create and enter session context - keep it alive
+        self._session_context = ClientSession(self.read_stream, self.write_stream)
+        self.session = await self._session_context.__aenter__()
         
         # Initialize session
         await self.session.initialize()
@@ -173,7 +182,8 @@ class MCPServerConnection:
                 description=tool.description or f"MCP tool: {tool.name}",
                 input_schema=tool.inputSchema if hasattr(tool, 'inputSchema') else {},
                 mcp_tool_name=tool.name,
-                session=self.session
+                session=self.session,
+                event_loop=self.event_loop
             )
             mcp_tools.append(mcp_tool)
         
@@ -183,10 +193,10 @@ class MCPServerConnection:
     async def disconnect(self):
         """Disconnect from MCP server."""
         try:
-            if self.session:
-                await self.session.__aexit__(None, None, None)
-            if self._context_manager:
-                await self._context_manager.__aexit__(None, None, None)
+            if self._session_context:
+                await self._session_context.__aexit__(None, None, None)
+            if self._stdio_context:
+                await self._stdio_context.__aexit__(None, None, None)
         except Exception as e:
             logger.error(f"Error disconnecting from '{self.name}': {e}", exc_info=True)
 
@@ -213,7 +223,7 @@ def load_mcp_config() -> List[dict]:
         return []
 
 
-async def load_all_mcp_tools() -> List[Tool]:
+async def load_all_mcp_tools_async() -> List[Tool]:
     """Load tools from all configured MCP servers."""
     server_configs = load_mcp_config()
     
@@ -245,6 +255,29 @@ async def load_all_mcp_tools() -> List[Tool]:
     return all_tools
 
 
+def load_all_mcp_tools() -> List[Tool]:
+    """Synchronous wrapper to load MCP tools in a background thread with persistent event loop."""
+    # Create a new event loop in a background thread
+    loop = asyncio.new_event_loop()
+    
+    def run_loop():
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+    
+    # Start the event loop in a daemon thread
+    thread = threading.Thread(target=run_loop, daemon=True)
+    thread.start()
+    
+    # Load tools using the background loop
+    future = asyncio.run_coroutine_threadsafe(load_all_mcp_tools_async(), loop)
+    tools = future.result(timeout=60)
+    
+    # Store the loop for later use
+    app.config['mcp_event_loop'] = loop
+    
+    return tools
+
+
 def get_agent():
     """Create and cache a smolagents ToolCallingAgent with a LiteLLM model.
 
@@ -259,17 +292,12 @@ def get_agent():
     
     # Load MCP tools from config
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            mcp_tools = loop.run_until_complete(load_all_mcp_tools())
-            tools.extend(mcp_tools)
-            if mcp_tools:
-                logger.info(f"Initialized with {len(mcp_tools)} MCP tool(s)")
-            else:
-                logger.info("No MCP tools loaded (check mcp-config.yaml)")
-        finally:
-            loop.close()
+        mcp_tools = load_all_mcp_tools()
+        tools.extend(mcp_tools)
+        if mcp_tools:
+            logger.info(f"Initialized with {len(mcp_tools)} MCP tool(s)")
+        else:
+            logger.info("No MCP tools loaded (check mcp-config.yaml)")
     except Exception as e:
         logger.error(f"Failed to load MCP tools: {e}", exc_info=True)
 
