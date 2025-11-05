@@ -2,7 +2,7 @@
 # - "https://agentgateway.dev/docs/llm/providers/anthropic/"
 
 binds:
-- port: 3000
+- port: 3010
   listeners:
   - routes:
     - backends:

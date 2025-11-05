@@ -112,9 +112,13 @@ $(CONFIG_FILES):
 	@cargo run -- -f $@ --validate-only
 
 .PHONY: myngl-start myngl-stop
+DOCKER=/usr/bin/docker
 myngl-start:
-	docker compose -f docker-compose-myngl.yaml up -d
-	./target/release/agentgateway -f config-myngl.yaml &
+	$(DOCKER) compose -f myngl/docker-compose.yaml up -d
+	# ./target/release/agentgateway -f myngl/agentgateway-config.yaml &
+	@echo Jaegar Tracing: http://127.0.0.1:16686/search
+	cd ui; npm dev run > ui.out 2>&1 &
+	@echo Agentgateway UI: http://127.0.0.1:3000/
 
 myngl-stop:
-	docker compose -f docker-compose-myngl.yaml down
+	$(DOCKER) compose -f docker-compose-myngl.yaml down

@@ -8,7 +8,7 @@ fi
 
 PROMPT="$1"
 # URL="http://127.0.0.1:3030/v1/chat/completions"
-URL="http://127.0.0.1:3000"  # via agentgateway
+URL="http://127.0.0.1:3010"  # via agentgateway
 
 # OpenAI-compatible chat completions format
 set -x

@@ -12,10 +12,12 @@ services:
   myngl:
     container_name: myngl-agent
     build:
-      context: ./myngl
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - .env
     ports:
       - "127.0.0.1:3030:3030"
+#  agentgateway:
+  
