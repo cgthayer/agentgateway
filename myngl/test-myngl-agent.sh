@@ -12,7 +12,7 @@ URL="http://127.0.0.1:3010"  # via agentgateway
 
 # OpenAI-compatible chat completions format
 set -x
-curl -v -X POST \
+curl -v \
   -H "Content-Type: application/json" \
   -d "{
     \"model\": \"claude-sonnet-4-20250514\",

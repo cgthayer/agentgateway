@@ -8,7 +8,8 @@ binds:
     - backends:
       - ai:
           name: myngl-test
-          hostOverride: localhost:3030
+          # hostOverride: localhost:3030
+          hostOverride: myngl-agent:3030
           provider:
             openAI:
               model: command

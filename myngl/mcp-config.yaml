@@ -10,7 +10,9 @@ servers:
       - "start-trino-mcp.sh"
     env:
       # Environment variables for this specific server
-      # TRINO_HOST: localhost
-      # TRINO_PORT: 8080
-      # TRINO_USER: AgentAnalyst
+      TRINO_SCHEME: "http"
+      # TRINO_HOST: "host.docker.internal"  # localhost inside docker
+      TRINO_HOST: "myngl-trino"  # for repo:myngl-demo
+      TRINO_PORT: "8080"
+      TRINO_USER: "AgentAlice"
     description: "Trino database query server"

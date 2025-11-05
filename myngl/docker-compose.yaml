@@ -1,5 +1,5 @@
 services:
-  jaeger:
+  myngl-jaeger:
     container_name: jaeger
     restart: unless-stopped
     image: jaegertracing/all-in-one:latest
@@ -9,8 +9,11 @@ services:
     - "127.0.0.1:4317:4317"
     environment:
     - COLLECTOR_OTLP_ENABLED=true
-  myngl:
+    networks:
+    - myngl-network    
+  myngl-agent:
     container_name: myngl-agent
+    hostname: myngl-agent
     build:
       context: .
       dockerfile: Dockerfile
@@ -18,6 +21,26 @@ services:
     env_file:
       - .env
     ports:
-      - "127.0.0.1:3030:3030"
-#  agentgateway:
-  
+      - "3030:3030"
+    networks:
+      - myngl-network      
+  myngl-agentgateway:
+    image: cgthayer/agentgateway:latest
+    command: ["-f", "/app/config/agentgateway-config.yaml"]
+    env_file:
+      - .env
+    hostname: agentgateway
+    volumes:
+      - ./:/app/config
+    ports:
+      - "3010:3010"
+      - "15000:15000"
+    networks:
+      - myngl-network
+      - public-network
+
+networks:
+  public-network:
+    driver: bridge
+  myngl-network:
+    driver: bridge
